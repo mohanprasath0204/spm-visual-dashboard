@@ -168,6 +168,23 @@
                 tbody.appendChild(tr);
             });
         }
+        // NEW: PDF Generation Function
+        function downloadPDF() {
+            // Target the main container to export
+            const element = document.querySelector('.max-w-5xl');
+            
+            // Configure the PDF settings
+            const opt = {
+                margin:       0.5,
+                filename:     `SPM_Audit_Report_${new Date().toISOString().split('T')[0]}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2 },
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+
+            // Generate and save the PDF
+            html2pdf().set(opt).from(element).save();
+        }
 
         function drawChart(data) {
             const labels = data.map(d => d.vendor_name);
