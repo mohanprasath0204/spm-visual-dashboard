@@ -68,16 +68,16 @@
                 { vendor_name: "Linde (Global)", base_capex: 1950000, total_amc: 250000, battery_cost: 0, lead_time_weeks: 12, tech_score: 92, has_auto_decel: true },
                 { vendor_name: "Jost's Engineering", base_capex: 1150000, total_amc: 140000, battery_cost: 200000, lead_time_weeks: 6, tech_score: 65, has_auto_decel: false },
                 { vendor_name: "Crown Equipment", base_capex: 1850000, total_amc: 195000, battery_cost: 225000, lead_time_weeks: 10, tech_score: 88, has_auto_decel: true }
-            ];// 3. Connect to your live Render Backend (Secured)
+            ];try {
+                // 3. Connect to your live Render Backend (Secured)
                 const response = await fetch('https://spm-api-backend.onrender.com/api/v1/rank-suppliers', {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'Authorization': 'Bearer YOUR_SECRET_PASSWORD'
+                        'Authorization': 'Bearer AtherAdminAccess2026'
                     },
                     body: JSON.stringify({ suppliers: initialSuppliers, ...weights })
                 });
-           
                 
                 const result = await response.json();
                 if(result.status === 'success') {
