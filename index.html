@@ -14,7 +14,6 @@
         <hr class="mb-8 border-slate-300">
 
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <!-- Priority Sliders -->
             <div class="bg-white p-4 rounded shadow border-t-4 border-blue-600">
                 <label class="block text-sm font-bold mb-2 text-slate-700">Cost Priority</label>
                 <input type="range" id="w_cost" min="0" max="1" step="0.1" value="0.4" class="w-full cursor-pointer" oninput="updateVal('cost_val', this.value)">
@@ -45,9 +44,35 @@
             <h2 class="text-xl font-bold mb-4 text-slate-800">Live Vendor Rankings (Out of 100)</h2>
             <canvas id="ahpChart" height="100"></canvas>
         </div>
+
+        <!-- NEW: Historical Audit Log Table -->
+        <div class="bg-white p-6 rounded shadow mt-8">
+            <h2 class="text-xl font-bold mb-4 text-slate-800">Decision Audit Log</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm text-left text-slate-600">
+                    <thead class="text-xs text-slate-700 uppercase bg-slate-100">
+                        <tr>
+                            <th class="px-4 py-3">Timestamp</th>
+                            <th class="px-4 py-3">Cost</th>
+                            <th class="px-4 py-3">Tech</th>
+                            <th class="px-4 py-3">Delivery</th>
+                            <th class="px-4 py-3">Safety</th>
+                            <th class="px-4 py-3">Top Supplier (Score)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTableBody">
+                        <!-- History rows will populate here automatically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <script>
+        // *** SECURITY CONFIGURATION ***
+        // Replace this with your exact Render password!
+        const API_TOKEN = "YOUR_SECRET_PASSWORD"; 
+        
         let chartInstance = null;
 
         function updateVal(id, val) {
@@ -55,26 +80,27 @@
         }
 
         async function runAHP() {
-            // 1. Capture slider weights
             const weights = {
                 weight_cost: parseFloat(document.getElementById('w_cost').value),
                 weight_tech: parseFloat(document.getElementById('w_tech').value),
                 weight_delivery: parseFloat(document.getElementById('w_delivery').value),
                 weight_safety: parseFloat(document.getElementById('w_safety').value)
-            };// 2. Synthetic MHE Dataset for IIM Portfolio (Confidentiality Maintained)
+            };
+            
             const initialSuppliers = [
                 { vendor_name: "Godrej (Domestic)", base_capex: 1450000, total_amc: 180000, battery_cost: 250000, lead_time_weeks: 8, tech_score: 78, has_auto_decel: false },
                 { vendor_name: "Toyota (Premium)", base_capex: 2100000, total_amc: 220000, battery_cost: 0, lead_time_weeks: 14, tech_score: 95, has_auto_decel: true },
                 { vendor_name: "Linde (Global)", base_capex: 1950000, total_amc: 250000, battery_cost: 0, lead_time_weeks: 12, tech_score: 92, has_auto_decel: true },
                 { vendor_name: "Jost's Engineering", base_capex: 1150000, total_amc: 140000, battery_cost: 200000, lead_time_weeks: 6, tech_score: 65, has_auto_decel: false },
                 { vendor_name: "Crown Equipment", base_capex: 1850000, total_amc: 195000, battery_cost: 225000, lead_time_weeks: 10, tech_score: 88, has_auto_decel: true }
-            ];try {
-                // 3. Connect to your live Render Backend (Secured)
+            ];
+            
+            try {
                 const response = await fetch('https://spm-api-backend.onrender.com/api/v1/rank-suppliers', {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'Authorization': 'Bearer AtherAdminAccess2026'
+                        'Authorization': `Bearer ${API_TOKEN}`
                     },
                     body: JSON.stringify({ suppliers: initialSuppliers, ...weights })
                 });
@@ -82,16 +108,60 @@
                 const result = await response.json();
                 if(result.status === 'success') {
                     drawChart(result.data);
+                    fetchHistory(); // Refresh history table after a new run
                 }
             } catch (error) {
                 alert("Connection failed. Check if the Render API is live.");
             }
         }
 
+        async function fetchHistory() {
+            try {
+                const response = await fetch('https://spm-api-backend.onrender.com/api/v1/history', {
+                    method: 'GET',
+                    headers: { 
+                        'Authorization': `Bearer ${API_TOKEN}`
+                    }
+                });
+                
+                const result = await response.json();
+                if(result.status === 'success') {
+                    populateTable(result.data);
+                }
+            } catch (error) {
+                console.error("Failed to load history.");
+            }
+        }
+
+        function populateTable(historyData) {
+            const tbody = document.getElementById('historyTableBody');
+            tbody.innerHTML = ''; 
+
+            historyData.forEach(log => {
+                const weights = JSON.parse(log.weights_json);
+                const results = JSON.parse(log.results_json);
+                const topSupplier = results[0];
+                const date = new Date(log.timestamp).toLocaleString();
+
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-slate-200 hover:bg-slate-50";
+                tr.innerHTML = `
+                    <td class="px-4 py-3 font-medium text-slate-900">${date}</td>
+                    <td class="px-4 py-3">${weights.weight_cost}</td>
+                    <td class="px-4 py-3">${weights.weight_tech}</td>
+                    <td class="px-4 py-3">${weights.weight_delivery}</td>
+                    <td class="px-4 py-3">${weights.weight_safety}</td>
+                    <td class="px-4 py-3 font-bold text-blue-600">
+                        ${topSupplier.vendor_name} (${topSupplier.final_ahp_score.toFixed(1)})
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
         function drawChart(data) {
             const labels = data.map(d => d.vendor_name);
             const scores = data.map(d => d.final_ahp_score);
-
             const ctx = document.getElementById('ahpChart').getContext('2d');
             if (chartInstance) chartInstance.destroy();
 
@@ -113,7 +183,10 @@
         }
         
         // Auto-run on page load
-        window.onload = runAHP;
+        window.onload = () => {
+            runAHP();
+            fetchHistory();
+        };
     </script>
 </body>
 </html>
